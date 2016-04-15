@@ -4,16 +4,16 @@ var React = require('react-native');
 import Message from './Message';
 var GiftedSpinner = require('react-native-gifted-spinner');
 var {
-  Text,
-  View,
-  ListView,
-  TextInput,
-  Dimensions,
-  Animated,
-  Image,
-  TouchableHighlight,
-  Platform,
-  PixelRatio
+    Text,
+    View,
+    ListView,
+    TextInput,
+    Dimensions,
+    Animated,
+    Image,
+    TouchableHighlight,
+    Platform,
+    PixelRatio
 } = React;
 
 var moment = require('moment');
@@ -48,19 +48,15 @@ var GiftedMessenger = React.createClass({
       senderName: 'Sender',
       senderImage: null,
       sendButtonText: 'Send',
-      leftControlBar: null,
       onImagePress: null,
       onMessageLongPress: null,
       hideTextInput: false,
       keyboardDismissMode: 'interactive',
       keyboardShouldPersistTaps: true,
       submitOnReturn: false,
-      blurOnSubmit: false,
       forceRenderImage: false,
       onChangeText: (text) => {},
       autoScroll: false,
-      scrollAnimated: true,
-      placeholderTextColor: '#ccc'
     };
   },
 
@@ -88,19 +84,14 @@ var GiftedMessenger = React.createClass({
     senderName: React.PropTypes.string,
     senderImage: React.PropTypes.object,
     sendButtonText: React.PropTypes.string,
-    leftControlBar: React.PropTypes.element,
     onImagePress: React.PropTypes.func,
     onMessageLongPress: React.PropTypes.func,
     hideTextInput: React.PropTypes.bool,
     keyboardDismissMode: React.PropTypes.string,
     keyboardShouldPersistTaps: React.PropTypes.bool,
-    submitOnReturn: React.PropTypes.bool,
-    blurOnSubmit: React.PropTypes.bool,
     forceRenderImage: React.PropTypes.bool,
     onChangeText: React.PropTypes.func,
     autoScroll: React.PropTypes.bool,
-    scrollAnimated: React.PropTypes.bool,
-    placeholderTextColor: React.PropTypes.string
   },
 
   getInitialState: function() {
@@ -125,6 +116,7 @@ var GiftedMessenger = React.createClass({
     return {
       dataSource: ds.cloneWithRows([]),
       text: '',
+      inpExtStyle: null,
       disabled: true,
       height: new Animated.Value(this.listViewMaxHeight),
       isLoadingEarlierMessages: false,
@@ -170,17 +162,17 @@ var GiftedMessenger = React.createClass({
     if (rowData.date instanceof Date) {
       if (diffMessage === null) {
         return (
-          <Text style={[this.styles.date]}>
-            {moment(rowData.date).calendar()}
-          </Text>
+            <Text style={[this.styles.date]}>
+              {moment(rowData.date).calendar()}
+            </Text>
         );
       } else if (diffMessage.date instanceof Date) {
         let diff = moment(rowData.date).diff(moment(diffMessage.date), 'minutes');
         if (diff > 5) {
           return (
-            <Text style={[this.styles.date]}>
-              {moment(rowData.date).calendar()}
-            </Text>
+              <Text style={[this.styles.date]}>
+                {moment(rowData.date).calendar()}
+              </Text>
           );
         }
       }
@@ -196,33 +188,37 @@ var GiftedMessenger = React.createClass({
     } else {
       diffMessage = this.getNextMessage(rowID);
     }
-
+    var dateLine = this.renderDate(rowData, rowID);
     return (
-      <View>
-        {this.renderDate(rowData, rowID)}
-        <Message
-          rowData={rowData}
-          rowID={rowID}
-          onErrorButtonPress={this.props.onErrorButtonPress}
-          displayNames={this.props.displayNames}
-          displayNamesInsideBubble={this.props.displayNamesInsideBubble}
-          diffMessage={diffMessage}
-          position={rowData.position}
-          forceRenderImage={this.props.forceRenderImage}
-          onImagePress={this.props.onImagePress}
-          onMessageLongPress={this.props.onMessageLongPress}
-          renderCustomText={this.props.renderCustomText}
+        <View>
+          {dateLine}
+          <Message
+              rowData={rowData}
+              rowID={rowID}
+              onErrorButtonPress={this.props.onErrorButtonPress}
+              displayNames={this.props.displayNames}
+              displayNamesInsideBubble={this.props.displayNamesInsideBubble}
+              diffMessage={diffMessage}
+              prevMessage={(!dateLine)?this.getPreviousMessage(rowID):null}
+              position={rowData.position}
+              forceRenderImage={this.props.forceRenderImage}
+              onImagePress={this.props.onImagePress}
+              onMessageLongPress={this.props.onMessageLongPress}
+              renderCustomText={this.props.renderCustomText}
 
-          styles={this.styles}
-        />
-      </View>
+              styles={this.styles}
+          />
+        </View>
     )
   },
 
-  onChangeText(text) {
+  onChangeText(e) {
+    var text = e.nativeEvent.text;
+    var inptSize = e.nativeEvent.contentSize;
     this.setState({
-      text: text
-    })
+      text: text,
+      inpExtStyle: {height: inptSize.height}
+    });
     if (text.trim().length > 0) {
       this.setState({
         disabled: false
@@ -254,7 +250,6 @@ var GiftedMessenger = React.createClass({
 
   },
 
-  // TODO appendMessages only if nextProps.messages is different from current messages
   componentWillReceiveProps(nextProps) {
     this._data = [];
     this._rowIds = [];
@@ -267,10 +262,6 @@ var GiftedMessenger = React.createClass({
 
     if (nextProps.maxHeight !== this.props.maxHeight) {
       this.listViewMaxHeight = nextProps.maxHeight;
-      Animated.timing(this.state.height, {
-        toValue: this.listViewMaxHeight,
-        duration: 150,
-      }).start();
     }
 
     if (nextProps.hideTextInput && !this.props.hideTextInput) {
@@ -295,38 +286,44 @@ var GiftedMessenger = React.createClass({
     }).start();
   },
 
-  
-  onKeyboardDidHide(e) {
-    if (Platform.OS === 'android') {
-      this.onKeyboardWillHide(e);
-    }
-  },
-  
   onKeyboardWillShow(e) {
     Animated.timing(this.state.height, {
-      toValue: this.listViewMaxHeight - e.endCoordinates.height,
+      toValue: this.listViewMaxHeight - (e.endCoordinates ? e.endCoordinates.height : e.end.height),
       duration: 200,
     }).start();
   },
 
   onKeyboardDidShow(e) {
-    if (Platform.OS === 'android') {
+    if(React.Platform.OS == 'android') {
       this.onKeyboardWillShow(e);
     }
-    
-    setTimeout(() => {
-      this.scrollToBottom();
-    }, (Platform.OS === 'android' ? 200 : 100));
+    this.scrollToBottom();
+  },
+  onKeyboardDidHide(e) {
+    if(React.Platform.OS == 'android') {
+      this.onKeyboardWillHide(e);
+    }
   },
 
-  scrollToBottom(animated = null) {
-    if (this.listHeight && this.footerY && this.footerY > this.listHeight) {
+  scrollToBottom() {
+    if (this.listHeight && this.footerY && this.footerY > this.listHeight-59) {
       var scrollDistance = this.listHeight - this.footerY;
-      this.scrollResponder.scrollTo({
-        y: -scrollDistance,
-        x: 0,
-        animated: typeof animated === 'boolean' ? animated : this.props.scrollAnimated,
-      });
+      /*this.scrollResponder.scrollTo({
+       y: -scrollDistance,
+       });*/
+      this.scrollResponder.scrollTo(-(scrollDistance-59));
+    }
+  },
+
+  scrollWithoutAnimationToBottom() {
+    if (this.listHeight && this.footerY && this.footerY > this.listHeight-59) {
+      var scrollDistance = this.listHeight - this.footerY;
+      /*this.scrollResponder.scrollTo({
+       y: -scrollDistance,
+       x: 0,
+       animated: false,
+       });*/
+      this.scrollResponder.scrollTo(-(scrollDistance-59), null, false);
     }
   },
 
@@ -343,7 +340,8 @@ var GiftedMessenger = React.createClass({
     } else {
       var rowID = this.appendMessage(message, true);
       this.props.handleSend(message, rowID);
-      this.onChangeText('');
+      this.setState({text:'', inpExtStyle:null});
+      this.props.onChangeText('');
     }
   },
 
@@ -371,20 +369,20 @@ var GiftedMessenger = React.createClass({
       if (this.state.allLoaded === false) {
         if (this.state.isLoadingEarlierMessages === true) {
           return (
-            <View style={this.styles.loadEarlierMessages}>
-              <GiftedSpinner />
-            </View>
+              <View style={this.styles.loadEarlierMessages}>
+                <GiftedSpinner />
+              </View>
           );
         } else {
           return (
-            <View style={this.styles.loadEarlierMessages}>
-              <Button
-                style={this.styles.loadEarlierMessagesButton}
-                onPress={() => {this.preLoadEarlierMessages()}}
-              >
-                {this.props.loadEarlierMessagesButtonText}
-              </Button>
-            </View>
+              <View style={this.styles.loadEarlierMessages}>
+                <Button
+                    style={this.styles.loadEarlierMessagesButton}
+                    onPress={() => {this.preLoadEarlierMessages()}}
+                >
+                  {this.props.loadEarlierMessagesButtonText}
+                </Button>
+              </View>
           );
         }
       }
@@ -462,41 +460,46 @@ var GiftedMessenger = React.createClass({
           }
         }
         this.refreshRows();
-        
-        requestAnimationFrame(() => {
-          this.scrollToBottom();
-        });
       }
     }
   },
-
+  renderJobBtn(){
+    if(typeof(this.props.jobFunction) != 'function') return null;
+    return (
+        <TouchableHighlight underlayColor='transparent' style={this.styles.jobBtnContainer} onPress={this.props.jobFunction}>
+          <View style={this.styles.jobBtn} >
+            <Text style={this.styles.jobBtnText}>view job</Text>
+          </View>
+        </TouchableHighlight>
+    );
+  },
   renderAnimatedView() {
     return (
-      <Animated.View
-        style={{
-          height: this.state.height,
+        <Animated.View
+            style={{
+          flex: 1,
         }}
 
-      >
-        <ListView
-          ref='listView'
-          dataSource={this.state.dataSource}
-          renderRow={this.renderRow}
-          renderHeader={this.renderLoadEarlierMessages}
-          enableEmptySections={true}
-          onLayout={(event) => {
+        >
+          <ListView
+              ref='listView'
+              dataSource={this.state.dataSource}
+              automaticallyAdjustContentInsets={false}
+              renderRow={this.renderRow}
+              renderHeader={this.renderLoadEarlierMessages}
+              onLayout={(event) => {
             var layout = event.nativeEvent.layout;
             this.listHeight = layout.height;
             if (this.firstDisplay === true) {
               requestAnimationFrame(() => {
                 this.firstDisplay = false;
-                this.scrollToBottom(false);
+                this.scrollWithoutAnimationToBottom();
               });
             }
 
           }}
-          renderFooter={() => {
-            return <View onLayout={(event)=>{
+              renderFooter={() => {
+            return <View style={this.styles.placeholder} onLayout={(event)=>{
               var layout = event.nativeEvent.layout;
               this.footerY = layout.y;
 
@@ -507,69 +510,75 @@ var GiftedMessenger = React.createClass({
           }}
 
 
-          style={this.styles.listView}
-
-          onKeyboardWillShow={this.onKeyboardWillShow} // not supported in Android - to fix this issue in Android, onKeyboardWillShow is called inside onKeyboardDidShow
-          onKeyboardDidShow={this.onKeyboardDidShow}
-          onKeyboardWillHide={this.onKeyboardWillHide} // not supported in Android - to fix this issue in Android, onKeyboardWillHide is called inside onKeyboardDidHide
-          onKeyboardDidHide={this.onKeyboardDidHide}
-
-          keyboardShouldPersistTaps={this.props.keyboardShouldPersistTaps} // @issue keyboardShouldPersistTaps={false} + textInput focused = 2 taps are needed to trigger the ParsedText links
-          keyboardDismissMode={this.props.keyboardDismissMode}
-
-          initialListSize={10}
-          pageSize={this.props.messages.length}
 
 
-          {...this.props}
-        />
+              style={this.styles.listView}
 
-      </Animated.View>
+
+              // not working android RN 0.14.2
+              onKeyboardWillShow={this.onKeyboardWillShow}
+              onKeyboardDidShow={this.onKeyboardDidShow}
+              onKeyboardWillHide={this.onKeyboardWillHide}
+              onKeyboardDidHide={this.onKeyboardDidHide}
+
+
+              keyboardShouldPersistTaps={this.props.keyboardShouldPersistTaps} // @issue keyboardShouldPersistTaps={false} + textInput focused = 2 taps are needed to trigger the ParsedText links
+              keyboardDismissMode={this.props.keyboardDismissMode}
+
+
+              initialListSize={10}
+              pageSize={this.props.messages.length}
+
+
+              {...this.props}
+          />
+
+        </Animated.View>
     );
   },
 
   render() {
     return (
-      <View
-        style={this.styles.container}
-        ref='container'
-      >
-        {this.renderAnimatedView()}
-        {this.renderTextInput()}
-      </View>
+        <View
+            style={this.styles.container}
+            ref='container'
+        >
+          {this.renderAnimatedView()}
+          {this.renderJobBtn()}
+          {this.renderTextInput()}
+        </View>
     )
   },
 
   renderTextInput() {
     if (this.props.hideTextInput === false) {
       return (
-        <View style={this.styles.textInputContainer}>
-          {this.props.leftControlBar}
-          <TextInput
-            style={this.styles.textInput}
-            placeholder={this.props.placeholder}
-            placeholderTextColor={this.props.placeholderTextColor}
-            ref='textInput'
-            onChangeText={this.onChangeText}
-            value={this.state.text}
-            autoFocus={this.props.autoFocus}
-            returnKeyType={this.props.submitOnReturn ? 'send' : 'default'}
-            onSubmitEditing={this.props.submitOnReturn ? this.onSend : null}
-            enablesReturnKeyAutomatically={true}
+          <View style={this.styles.textInputContainer}>
+            <TextInput
+                style={[this.styles.textInput, this.state.inpExtStyle]}
+                placeholder={this.props.placeholder}
+                ref='textInput'
+                multiline={true}
+                onChange={this.onChangeText}
+                value={this.state.text}
+                autoFocus={this.props.autoFocus}
+                returnKeyType={this.props.submitOnReturn ? 'send' : 'default'}
+                onSubmitEditing={this.props.submitOnReturn ? this.onSend : null}
+                enablesReturnKeyAutomatically={true}
 
-            blurOnSubmit={this.props.blurOnSubmit}
-            
-            
-          />
-          <Button
-            style={this.styles.sendButton}
-            styleDisabled={this.styles.sendButtonDisabled}
-            onPress={this.onSend}
-            disabled={this.state.disabled}
-          >
-            {this.props.sendButtonText}
-          </Button>
-        </View>
+                blurOnSubmit={false}
+            />
+            <View style={this.styles.btnContainer}>
+              <Button
+                  style={this.styles.sendButton}
+                  styleDisabled={this.styles.sendButtonDisabled}
+                  onPress={this.onSend}
+                  disabled={this.state.disabled}
+              >
+                {this.props.sendButtonText}
+              </Button>
+            </View>
+          </View>
       );
     }
     return null;
@@ -583,14 +592,39 @@ var GiftedMessenger = React.createClass({
       },
       listView: {
         flex: 1,
+        paddingTop: 10
+      },
+      jobBtnContainer:{
+        marginTop: -48,
+        backgroundColor: 'transparent'
+      },
+      jobBtn:{
+        width: Dimensions.get('window').width,
+        height: 47,
+        alignSelf: 'center',
+        justifyContent: 'center',
+        borderTopWidth: 1,
+        borderColor: 'white',
+        backgroundColor: "#5A99FF",
+
+      },
+      jobBtnText:{
+        color: 'white',
+        fontSize: 16,
+        listHeight: 19,
+        alignSelf: 'center',
+        fontWeight: '500',
+        fontFamily: 'SF UI Text'
       },
       textInputContainer: {
-        height: 44,
         borderTopWidth: 1 / PixelRatio.get(),
         borderColor: '#b2b2b2',
         flexDirection: 'row',
+        paddingTop:7,
+        paddingBottom:11,
         paddingLeft: 10,
         paddingRight: 10,
+        justifyContent: 'center',
       },
       textInput: {
         alignSelf: 'center',
@@ -602,8 +636,15 @@ var GiftedMessenger = React.createClass({
         margin: 0,
         fontSize: 15,
       },
+      placeholder:{
+        height: 59
+      },
+      btnContainer:{
+        /*flex: 1,
+         justifyContent: 'center'*/
+      },
       sendButton: {
-        marginTop: 11,
+        flex: 1,
         marginLeft: 10,
       },
       date: {
