@@ -83,12 +83,12 @@ export default class Message extends React.Component {
                   underlayColor='transparent'
                   onPress={() => onImagePress(rowData, rowID)}
               >
-                <Image source={(rowData.image!="plural bot")?rowData.image:require('image!plural_avatar')} style={[styles.imagePosition, styles.image, (rowData.position === 'left' ? styles.imageLeft : styles.imageRight)]}/>
+                <Image source={(rowData.image!="plural bot")?{uri:rowData.image.uri}:require('image!plural_avatar')} style={[styles.imagePosition, styles.image, (rowData.position === 'left' ? styles.imageLeft : styles.imageRight)]}/>
               </TouchableHighlight>
           );
         } else {
           return (
-              <Image source={(rowData.image!="plural bot")?rowData.image:require('image!plural_avatar')} style={[styles.imagePosition, styles.image, (rowData.position === 'left' ? styles.imageLeft : styles.imageRight)]}/>
+              <Image source={(rowData.image!="plural bot")?{uri:rowData.image.uri}:require('image!plural_avatar')} style={[styles.imagePosition, styles.image, (rowData.position === 'left' ? styles.imageLeft : styles.imageRight)]}/>
           );
         }
       } else {
